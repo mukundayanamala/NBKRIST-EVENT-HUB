@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NBKRIST Events Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --navy:#0A1628;--navy2:#0f1f3d;--card:#131f38;
+  --orange:#FF6B35;--orange2:#e85d2a;
+  --purple:#7c3aed;--purple2:#6d28d9;
+  --green:#22c55e;--red:#ef4444;
+  --gray:#8a9bb5;--border:rgba(255,255,255,.08);
+}
+body{font-family:'Inter',sans-serif;background:var(--navy);color:#fff;overflow-x:hidden;}
+h1,h2,h3,h4{font-family:'Poppins',sans-serif;}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-thumb{background:var(--orange);border-radius:3px;}
+
+/* OFFLINE */
+#offlineScreen{display:none;position:fixed;inset:0;z-index:99999;background:#060e1c;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px;}
+#offlineScreen.on{display:flex;}
+#offlineScreen .ico{font-size:70px;color:var(--red);margin-bottom:20px;animation:offBounce 1.5s infinite;}
+@keyframes offBounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+#offlineScreen h2{font-size:28px;font-weight:800;margin-bottom:10px;}
+#offlineScreen p{color:var(--gray);font-size:14px;max-width:380px;line-height:1.8;margin-bottom:22px;}
+
+/* LOADING */
+#loadScreen{position:fixed;inset:0;z-index:9998;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .4s;}
+#loadScreen.off{opacity:0;pointer-events:none;}
+.spinner{width:48px;height:48px;border:4px solid rgba(255,107,53,.15);border-top-color:var(--orange);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loadScreen p{color:var(--gray);font-size:13px;font-weight:500;}
+
+/* WATERMARK */
+.wm{position:fixed;inset:0;z-index:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
+.wm span{font-family:'Poppins',sans-serif;font-size:clamp(36px,8vw,90px);font-weight:900;color:rgba(255,107,53,.035);transform:rotate(-25deg);white-space:nowrap;user-select:none;}
+
+/* PAGE */
+.page{display:none;min-height:100vh;position:relative;z-index:1;}
+.page.active{display:flex;flex-direction:column;}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;font-weight:600;font-size:13px;z-index:9000;opacity:0;transform:translateY(14px);transition:.3s;max-width:320px;background:var(--orange);color:#fff;pointer-events:none;}
+#toast.show{opacity:1;transform:translateY(0);}
+#toast.err{background:var(--red);}
+#toast.ok{background:var(--green);}
+#toast.mgr{background:var(--purple);}
+
+/* MODALS */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(5px);}
+.overlay.on{display:flex;}
+.mbox{background:var(--navy2);border:1px solid var(--border);border-radius:18px;padding:32px;width:92%;max-width:500px;max-height:92vh;overflow-y:auto;position:relative;animation:slideUp .25s ease;}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.mclose{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--gray);font-size:20px;cursor:pointer;transition:.2s;z-index:2;}
+.mclose:hover{color:#fff;}
+
+/* FORMS */
+.fg{margin-bottom:14px;}
+.fg label{display:block;font-size:12px;color:var(--gray);font-weight:500;margin-bottom:6px;}
+.fg input,.fg select,.fg textarea{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:9px;padding:11px 14px;color:#fff;font-size:13px;font-family:inherit;outline:none;transition:.2s;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--orange);background:rgba(255,107,53,.05);}
+.fg select option{background:var(--navy2);}
+.fg textarea{resize:vertical;min-height:76px;}
+.fg .hint{font-size:11px;color:var(--gray);margin-top:4px;}
+.fg .ferr{font-size:11px;color:var(--red);margin-top:4px;display:none;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:11px 20px;border-radius:9px;font-weight:600;font-size:13px;cursor:pointer;border:none;font-family:inherit;transition:.2s;}
+.btn-o{background:var(--orange);color:#fff;}.btn-o:hover{background:var(--orange2);}
+.btn-p{background:linear-gradient(135deg,var(--purple),#9f5fe8);color:#fff;box-shadow:0 4px 14px rgba(124,58,237,.3);}.btn-p:hover{opacity:.9;}
+.btn-g{background:transparent;border:1.5px solid rgba(255,255,255,.15);color:#fff;}.btn-g:hover{border-color:var(--orange);color:var(--orange);}
+.btn-green{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.28);color:#22c55e;}
+.btn-red{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.28);color:#ef4444;}
+.btn-full{width:100%;justify-content:center;}
+.btn-sm{padding:7px 13px;font-size:12px;}
+.btn:disabled{opacity:.55;cursor:not-allowed;}
+
+/* PHOTO UPLOAD */
+.photo-box{border:2px dashed var(--border);border-radius:11px;padding:18px;text-align:center;cursor:pointer;transition:.2s;background:rgba(255,255,255,.02);}
+.photo-box:hover{border-color:var(--orange);background:rgba(255,107,53,.04);}
+.photo-box i.icon{font-size:24px;color:var(--gray);margin-bottom:7px;display:block;}
+.photo-box p{color:var(--gray);font-size:12px;}
+.photo-fn{color:var(--orange);font-size:11px;margin-top:5px;}
+.photo-circle{width:72px;height:72px;border-radius:50%;overflow:hidden;margin:0 auto 8px;border:3px solid var(--orange);display:none;}
+.photo-circle img{width:100%;height:100%;object-fit:cover;}
+.id-preview{width:100%;max-height:85px;border-radius:8px;overflow:hidden;margin-top:7px;display:none;}
+.id-preview img{width:100%;object-fit:cover;}
+
+/* NAV */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 32px;background:rgba(10,22,40,.93);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.logo-row{display:flex;align-items:center;gap:10px;}
+.logo-txt{font-family:'Poppins',sans-serif;}
+.logo-txt .main{font-size:15px;font-weight:800;color:#fff;display:block;line-height:1.2;}
+.logo-txt .sub{font-size:9px;color:var(--orange);text-transform:uppercase;letter-spacing:.7px;font-weight:700;}
+
+/* HERO */
+.hero{padding:72px 32px 54px;text-align:center;position:relative;background:linear-gradient(160deg,#0A1628,#0d1e3a 50%,#180e38);}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(255,107,53,.12),transparent 65%);pointer-events:none;}
+.hero-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.26);border-radius:50px;padding:5px 16px;font-size:11px;font-weight:700;color:var(--orange);margin-bottom:18px;text-transform:uppercase;letter-spacing:.5px;}
+.hero-badge .dot{width:7px;height:7px;background:var(--orange);border-radius:50%;animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.hero h1{font-size:clamp(28px,5vw,52px);font-weight:900;line-height:1.1;margin-bottom:10px;background:linear-gradient(135deg,#fff 60%,var(--orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero .htag{font-size:16px;font-weight:600;color:var(--orange);font-family:'Poppins',sans-serif;margin-bottom:10px;}
+.hero .hdesc{color:var(--gray);font-size:14px;max-width:510px;margin:0 auto 30px;line-height:1.75;}
+.hero-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+.hero-stats{display:flex;justify-content:center;gap:34px;margin-top:42px;padding:20px 32px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:14px;max-width:520px;margin-left:auto;margin-right:auto;flex-wrap:wrap;}
+.stat .num{font-size:28px;font-weight:800;font-family:'Poppins',sans-serif;}
+.stat .suf{font-size:15px;color:var(--orange);font-weight:800;}
+.stat .lbl{font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.7px;margin-top:3px;}
+
+/* EVENTS */
+.sec{padding:40px 32px;}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+.sec-tag{font-size:11px;color:var(--orange);font-weight:700;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;}
+.sec-title{font-size:21px;font-weight:700;}
+.ftabs{display:flex;gap:7px;flex-wrap:wrap;}
+.ftab{padding:6px 14px;border-radius:50px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);color:var(--gray);transition:.2s;background:transparent;}
+.ftab.on,.ftab:hover{background:var(--orange);border-color:var(--orange);color:#fff;}
+.egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:18px;}
+.ecard{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:.3s;cursor:pointer;}
+.ecard:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(0,0,0,.4);border-color:rgba(255,107,53,.25);}
+.ecard-img{height:165px;background:linear-gradient(135deg,#1a2540,#2d1b4e);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:40px;}
+.ecard-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.ebadges{position:absolute;top:8px;left:8px;display:flex;gap:4px;z-index:1;}
+.eb{padding:3px 9px;border-radius:50px;font-size:9px;font-weight:700;text-transform:uppercase;background:rgba(255,107,53,.88);color:#fff;}
+.ecard-body{padding:14px;}
+.emeta{display:flex;gap:12px;margin-bottom:7px;flex-wrap:wrap;}
+.emeta span{font-size:11px;color:var(--gray);display:flex;align-items:center;gap:4px;}
+.ecard-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;margin-bottom:5px;}
+.ecard-desc{font-size:12px;color:var(--gray);line-height:1.5;margin-bottom:11px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.ecard-foot{display:flex;align-items:center;justify-content:space-between;}
+.estatus-open{font-size:11px;font-weight:600;color:var(--green);}
+.estatus-done{font-size:11px;font-weight:600;color:var(--gray);}
+.ecard.done .ecard-img::after{content:'COMPLETED';position:absolute;inset:0;background:rgba(0,0,0,.52);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;letter-spacing:2px;color:rgba(255,255,255,.7);z-index:2;}
+.empty{text-align:center;padding:52px 16px;grid-column:1/-1;}
+.empty i{font-size:42px;color:rgba(255,107,53,.2);margin-bottom:12px;display:block;}
+.empty h3{font-size:16px;color:var(--gray);margin-bottom:5px;}
+.empty p{font-size:12px;color:var(--gray);line-height:1.6;}
+
+/* FOOTER */
+.foot-top{text-align:center;padding:15px 32px;background:rgba(255,255,255,.03);border-top:1px solid var(--border);font-size:12px;color:var(--gray);line-height:1.9;}
+.foot-top a{color:var(--orange);text-decoration:none;}
+.foot-bot{background:#060e1c;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.foot-links a{color:var(--gray);text-decoration:none;font-size:12px;margin-right:18px;transition:.2s;}
+.foot-links a:hover{color:var(--orange);}
+
+/* AUTH TABS */
+.atabs{display:flex;background:rgba(255,255,255,.05);border-radius:9px;padding:3px;margin-bottom:20px;}
+.atab{flex:1;padding:9px;text-align:center;border-radius:7px;cursor:pointer;font-weight:600;font-size:13px;color:var(--gray);transition:.2s;}
+.atab.on{background:var(--orange);color:#fff;}
+.aform{display:none;}.aform.on{display:block;}
+
+/* AVATAR */
+.avatar{width:35px;height:35px;border-radius:50%;background:linear-gradient(135deg,var(--orange),#ff9f70);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;cursor:pointer;flex-shrink:0;overflow:hidden;}
+.avatar img{width:100%;height:100%;object-fit:cover;}
+.avatar-lg{width:64px;height:64px;border-radius:50%;overflow:hidden;border:3px solid var(--orange);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--orange),#ff9f70);font-size:22px;font-weight:700;}
+.avatar-lg img{width:100%;height:100%;object-fit:cover;}
+
+/* DASHBOARD SHARED */
+.dash-nav{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:rgba(10,22,40,.95);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
+.dash-body{display:flex;flex:1;}
+.sidebar{width:220px;background:var(--navy2);border-right:1px solid var(--border);padding:12px 0;display:flex;flex-direction:column;height:calc(100vh - 60px);position:sticky;top:60px;overflow-y:auto;flex-shrink:0;}
+.sitem{display:flex;align-items:center;gap:11px;padding:10px 13px;margin:1px 8px;border-radius:9px;cursor:pointer;color:var(--gray);font-size:13px;font-weight:500;transition:.2s;}
+.sitem i{width:16px;text-align:center;font-size:13px;}
+.sitem:hover{background:rgba(255,255,255,.06);color:#fff;}
+.sitem.on{background:rgba(255,107,53,.14);color:var(--orange);}
+.sdiv{height:1px;background:var(--border);margin:7px 10px;}
+.s-user{display:flex;align-items:center;gap:9px;padding:10px;background:rgba(255,255,255,.04);border-radius:9px;margin:8px;}
+.s-user-info strong{display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;}
+.s-user-info span{font-size:10px;color:var(--gray);}
+.main{flex:1;padding:22px;overflow-y:auto;}
+.dsec{display:none;}.dsec.on{display:block;}
+.dhead{margin-bottom:20px;}
+.dhead h2{font-size:19px;font-weight:700;margin-bottom:3px;}
+.dhead p{color:var(--gray);font-size:13px;}
+.etabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:18px;}
+.etab{padding:9px 17px;font-size:13px;font-weight:600;cursor:pointer;color:var(--gray);border-bottom:2px solid transparent;transition:.2s;margin-bottom:-1px;}
+.etab.on{color:var(--orange);border-color:var(--orange);}
+
+/* PROFILE */
+.pcard{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;gap:20px;align-items:flex-start;}
+.pcard .pr h3{font-size:18px;font-weight:700;margin-bottom:5px;}
+.prole{display:inline-flex;align-items:center;gap:5px;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.22);border-radius:50px;padding:3px 11px;font-size:11px;color:var(--orange);font-weight:600;margin-bottom:9px;}
+.pd{font-size:12px;color:var(--gray);margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+.pd i{color:var(--orange);width:16px;text-align:center;}
+.idframe{border:1px solid var(--border);border-radius:9px;overflow:hidden;margin-top:10px;max-width:170px;}
+.idframe img{width:100%;display:block;}
+.idframe p{font-size:10px;color:var(--gray);text-align:center;padding:5px;}
+
+/* CERTS */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:16px;}
+.ccard{background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;transition:.3s;}
+.ccard:hover{transform:translateY(-3px);border-color:rgba(255,107,53,.25);}
+.ccard-img{height:125px;background:linear-gradient(135deg,#1a1040,#2d1b4e);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+.ccard-img img{width:100%;height:100%;object-fit:cover;}
+.cribbon{position:absolute;top:7px;right:7px;border-radius:5px;padding:2px 8px;font-size:9px;font-weight:700;}
+.ccard-body{padding:13px;}
+.ccard-title{font-weight:700;font-size:13px;margin-bottom:3px;}
+.ccard-date{font-size:11px;color:var(--gray);margin-bottom:9px;}
+
+/* CONTACT */
+.cgrid2{display:grid;grid-template-columns:1fr 1fr;gap:15px;}
+.cbox{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;}
+.cbox h3{font-size:13px;font-weight:700;margin-bottom:13px;display:flex;align-items:center;gap:7px;}
+.cbox h3 i{color:var(--orange);}
+.ci{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.ci:last-of-type{border-bottom:none;}
+.ci-icon{width:30px;height:30px;border-radius:7px;background:rgba(255,107,53,.1);display:flex;align-items:center;justify-content:center;color:var(--orange);flex-shrink:0;font-size:12px;}
+.ci-info strong{display:block;font-size:12px;font-weight:600;margin-bottom:2px;}
+.ci-info span,.ci-info a{font-size:11px;color:var(--gray);}
+.ci-info a{color:var(--orange);text-decoration:none;}
+.map-ph{background:rgba(255,255,255,.03);border-radius:9px;height:150px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--border);margin-top:10px;}
+
+/* MANAGER */
+#manager .dash-nav{top:35px;}
+#manager .sidebar{height:calc(100vh - 95px);top:95px;}
+.mgr-topbar{display:flex;align-items:center;gap:10px;padding:7px 20px;background:linear-gradient(90deg,var(--purple),#9f5fe8);font-size:12px;font-weight:600;color:#fff;position:sticky;top:0;z-index:101;}
+.mgr-exit{background:rgba(255,255,255,.2);border:none;color:#fff;padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;margin-left:auto;transition:.2s;}
+.mgr-exit:hover{background:rgba(255,255,255,.33);}
+#manager .sitem.on{background:rgba(124,58,237,.18);color:#a78bfa;}
+#manager .host-btn{margin:10px;background:linear-gradient(135deg,var(--purple),#9f5fe8);border-radius:11px;padding:13px 14px;display:flex;align-items:center;gap:9px;cursor:pointer;transition:.2s;font-weight:700;font-size:13px;color:#fff;box-shadow:0 4px 12px rgba(124,58,237,.28);}
+#manager .host-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(124,58,237,.38);}
+.sbadge{margin-left:auto;background:var(--orange);color:#fff;border-radius:50px;font-size:10px;padding:2px 7px;font-weight:700;}
+.mgr-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--purple),#9f5fe8);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff;flex-shrink:0;}
+.mgr-dot{width:7px;height:7px;border-radius:50%;background:#a5f3fc;flex-shrink:0;animation:pulse 1.5s infinite;}
+#manager .s-user{background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2);}
+#manager .s-user-info span{color:#a78bfa;}
+
+/* STEPPER */
+.stepper{display:flex;align-items:center;margin-bottom:24px;}
+.step{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;}
+.stepn{width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid var(--border);color:var(--gray);transition:.3s;}
+.step.on .stepn{background:var(--purple);border-color:var(--purple);color:#fff;}
+.step.done .stepn{background:var(--green);border-color:var(--green);color:#fff;}
+.step-lbl{color:var(--gray);}.step.on .step-lbl,.step.done .step-lbl{color:#fff;}
+.step-line{flex:1;height:2px;background:var(--border);margin:0 7px;min-width:24px;}
+.uarea{border:2px dashed var(--border);border-radius:11px;padding:20px;text-align:center;cursor:pointer;transition:.2s;background:rgba(255,255,255,.02);}
+.uarea:hover{border-color:var(--purple);background:rgba(124,58,237,.04);}
+.uarea i.icon{font-size:22px;color:var(--gray);margin-bottom:7px;display:block;}
+.uarea p{color:var(--gray);font-size:12px;}
+.ufile{color:var(--orange);font-size:11px;margin-top:5px;}
+.uprev{display:none;margin-top:8px;}
+.uprev img{max-width:100%;border-radius:7px;max-height:110px;object-fit:cover;}
+.branch-sel{display:flex;flex-wrap:wrap;gap:7px;}
+.bitem{padding:5px 13px;border-radius:50px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);color:var(--gray);transition:.2s;user-select:none;}
+.bitem.on{background:rgba(124,58,237,.17);border-color:var(--purple);color:#a78bfa;}
+.fsec-title{font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:11px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;}
+.prev-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;max-width:285px;}
+.prev-img{height:165px;background:linear-gradient(135deg,#1a2540,#2d1b4e);display:flex;align-items:center;justify-content:center;font-size:40px;position:relative;overflow:hidden;}
+.prev-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.prev-body{padding:13px;}
+
+/* RECORDS TABLE */
+.rtable{background:var(--card);border:1px solid var(--border);border-radius:13px;overflow-x:auto;}
+.rtable table{width:100%;border-collapse:collapse;min-width:700px;}
+.rtable th{background:rgba(255,255,255,.04);padding:10px 13px;text-align:left;font-size:10px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;font-weight:600;}
+.rtable td{padding:10px 13px;font-size:13px;border-top:1px solid var(--border);vertical-align:middle;}
+.rtable tr:hover td{background:rgba(255,255,255,.02);}
+.spill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:50px;font-size:11px;font-weight:700;}
+.s-ongoing{background:rgba(34,197,94,.13);color:#22c55e;}
+.s-completed{background:rgba(100,116,139,.13);color:#94a3b8;}
+.thumb{width:35px;height:35px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;background:rgba(124,58,237,.12);overflow:hidden;flex-shrink:0;}
+.thumb img{width:100%;height:100%;object-fit:cover;}
+
+/* MGR LOGIN MODAL */
+.mgr-mhead{background:linear-gradient(135deg,#1e0a3c,#2d1060);border-radius:13px;padding:24px 20px;text-align:center;margin-bottom:20px;border:1px solid rgba(124,58,237,.26);position:relative;overflow:hidden;}
+.mgr-mhead::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(124,58,237,.22),transparent 70%);pointer-events:none;}
+.mgr-shield{width:52px;height:52px;background:linear-gradient(135deg,var(--purple),#9f5fe8);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;box-shadow:0 0 20px rgba(124,58,237,.38);}
+.mgr-shield i{font-size:22px;color:#fff;}
+.mgr-warn{background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2);border-radius:9px;padding:10px 13px;font-size:12px;color:rgba(200,180,255,.85);margin-bottom:14px;display:flex;gap:9px;align-items:flex-start;line-height:1.5;}
+.mgr-warn i{color:var(--purple);margin-top:1px;flex-shrink:0;}
+.mgr-fg input,.mgr-fg select{border-color:rgba(124,58,237,.26)!important;}
+.mgr-fg input:focus,.mgr-fg select:focus{border-color:var(--purple)!important;background:rgba(124,58,237,.05)!important;}
+.sanim{text-align:center;padding:6px 0;}
+.sanim i{font-size:46px;color:var(--green);margin-bottom:12px;display:block;}
+
+@media(max-width:768px){
+  .row2,.cgrid2{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .hero{padding:44px 14px 32px;}
+  .sec,.topbar{padding-left:14px;padding-right:14px;}
+  .pcard{flex-direction:column;align-items:center;text-align:center;}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ OFFLINE SCREEN ═══ -->
+<div id="offlineScreen">
+  <div class="ico">📡</div>
+  <h2>No Internet Connection</h2>
+  <p>NBKRIST Events Hub requires an active internet connection to load events, student data, and registration forms.</p>
+  <button class="btn btn-o" onclick="location.reload()"><i class="fas fa-redo"></i> Retry Connection</button>
+</div>
+
+<!-- ═══ LOADING SCREEN ═══ -->
+<div id="loadScreen">
+  <div class="spinner"></div>
+  <p>Loading NBKRIST Events Hub...</p>
+</div>
+
+<!-- WATERMARK -->
+<div class="wm"><span>NBKRIST EVENTS HUB</span></div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ═══════════════════════════════════════════
+     STUDENT AUTH MODAL
+═══════════════════════════════════════════ -->
+<div class="overlay" id="studentModal">
+  <div class="mbox">
+    <button class="mclose" onclick="closeModal('studentModal')"><i class="fas fa-times"></i></button>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div id="authLogo" style="margin:0 auto 10px;"></div>
+      <h3 style="font-size:17px;">NBKRIST Events Hub</h3>
+      <p style="color:var(--gray);font-size:12px;">Student Portal Access</p>
+    </div>
+    <div class="atabs">
+      <div class="atab on" id="aLogin" onclick="switchAuth('login')">Login</div>
+      <div class="atab" id="aReg" onclick="switchAuth('reg')">Create Account</div>
+    </div>
+
+    <!-- LOGIN -->
+    <div class="aform on" id="fLogin">
+      <div class="fg"><label>Email Address</label><input type="email" id="lEmail" placeholder="your@email.com"></div>
+      <div class="fg"><label>Password</label><input type="password" id="lPass" placeholder="Enter password"></div>
+      <div style="text-align:right;margin-bottom:12px;"><span style="color:var(--orange);font-size:12px;cursor:pointer;">Forgot Password?</span></div>
+      <button class="btn btn-o btn-full" id="loginBtn" onclick="doLogin()"><i class="fas fa-sign-in-alt"></i> Login</button>
+      <p style="text-align:center;color:var(--gray);font-size:12px;margin-top:12px;">No account? <span style="color:var(--orange);cursor:pointer;" onclick="switchAuth('reg')">Create one</span></p>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="aform" id="fReg">
+      <div class="fg">
+        <label><i class="fas fa-camera" style="color:var(--orange);margin-right:5px;"></i>Profile Photo <span style="color:var(--orange);">*</span></label>
+        <div class="photo-box" onclick="document.getElementById('ppFile').click()">
+          <div class="photo-circle" id="ppCircle"><img id="ppThumb" src="" alt=""></div>
+          <i class="fas fa-user-circle icon" id="ppIcon"></i>
+          <p>Click to upload your photo<br><span style="font-size:11px;">JPG / PNG · Clear face photo</span></p>
+          <div class="photo-fn" id="ppFn"></div>
+        </div>
+        <input type="file" id="ppFile" accept="image/*" style="display:none;" onchange="onPP(this)">
+      </div>
+      <div class="fg">
+        <label><i class="fas fa-id-card" style="color:var(--orange);margin-right:5px;"></i>Student ID Card Photo <span style="color:var(--orange);">*</span></label>
+        <div class="photo-box" onclick="document.getElementById('idFile').click()">
+          <i class="fas fa-credit-card icon" id="idIcon"></i>
+          <p>Click to upload ID card<br><span style="font-size:11px;">JPG / PNG</span></p>
+          <div class="photo-fn" id="idFn"></div>
+          <div class="id-preview" id="idPrev"><img id="idThumb" src="" alt=""></div>
+        </div>
+        <input type="file" id="idFile" accept="image/*" style="display:none;" onchange="onID(this)">
+      </div>
+      <div class="row2">
+        <div class="fg"><label>Full Name</label><input type="text" id="rName" placeholder="Your full name"></div>
+        <div class="fg">
+          <label>Roll Number <span style="color:var(--orange);">*</span></label>
+          <input type="text" id="rRoll" placeholder="e.g. 21B91A0501" maxlength="10" oninput="chkRoll()">
+          <div class="hint">Alphanumeric · Exactly 10 chars</div>
+          <div class="ferr" id="rollErr">Must be exactly 10 alphanumeric characters</div>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="fg"><label>Branch</label>
+          <select id="rBranch"><option value="">Select Branch</option><option>CSE</option><option>ECE</option><option>EEE</option><option>MECH</option><option>CIVIL</option><option>IT</option><option>AI&DS</option></select>
+        </div>
+        <div class="fg"><label>Year</label>
+          <select id="rYear"><option value="">Select Year</option><option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option></select>
+        </div>
+      </div>
+      <div class="fg"><label>Email</label><input type="email" id="rEmail" placeholder="your@email.com"></div>
+      <div class="row2">
+        <div class="fg"><label>Password</label><input type="password" id="rPass" placeholder="Min 6 characters"></div>
+        <div class="fg"><label>Confirm Password</label><input type="password" id="rPass2" placeholder="Repeat password"></div>
+      </div>
+      <button class="btn btn-o btn-full" id="regBtn" onclick="doRegister()"><i class="fas fa-user-plus"></i> Create Account</button>
+      <p style="text-align:center;color:var(--gray);font-size:12px;margin-top:12px;">Have account? <span style="color:var(--orange);cursor:pointer;" onclick="switchAuth('login')">Login</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MANAGER AUTH MODAL
+═══════════════════════════════════════════ -->
+<div class="overlay" id="managerModal">
+  <div class="mbox" style="max-width:440px;">
+    <button class="mclose" onclick="closeModal('managerModal')"><i class="fas fa-times"></i></button>
+    <div class="mgr-mhead">
+      <div class="mgr-shield"><i class="fas fa-shield-alt"></i></div>
+      <h3>Event Manager Access</h3>
+      <p style="color:rgba(255,255,255,.6);font-size:12px;">Restricted — Authorized Personnel Only</p>
+    </div>
+    <div class="mgr-warn">
+      <i class="fas fa-lock"></i>
+      <span>This section is restricted to authorized NBKRIST Event Managers only. Unauthorized access attempts are monitored and reported.</span>
+    </div>
+    <div class="fg mgr-fg"><label><i class="fas fa-id-badge" style="color:var(--purple);margin-right:5px;"></i>Manager ID</label><input type="text" id="mId" autocomplete="off" placeholder="Enter Manager ID"></div>
+    <div class="fg mgr-fg"><label><i class="fas fa-building" style="color:var(--purple);margin-right:5px;"></i>Department</label>
+      <select id="mDept"><option value="">Select Department</option><option>CSE Department</option><option>ECE Department</option><option>EEE Department</option><option>MECH Department</option><option>CIVIL Department</option><option>IT Department</option><option>AI&DS Department</option><option>College Administration</option><option>Student Affairs</option></select>
+    </div>
+    <div class="fg mgr-fg"><label><i class="fas fa-key" style="color:var(--purple);margin-right:5px;"></i>Password</label><input type="password" id="mPass" placeholder="Manager password"></div>
+    <div class="fg mgr-fg">
+      <label><i class="fas fa-fingerprint" style="color:var(--purple);margin-right:5px;"></i>Authorization Key</label>
+      <input type="password" id="mAuthKey" placeholder="Secret authorization key">
+      <div class="hint" style="color:rgba(200,180,255,.6);">Contact college IT department for your authorization key</div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-g" style="flex:1;" onclick="closeModal('managerModal')">Cancel</button>
+      <button class="btn btn-p" style="flex:2;" onclick="doMgrLogin()"><i class="fas fa-unlock-alt"></i> Authenticate & Access</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM MODAL -->
+<div class="overlay" id="formModal">
+  <div class="mbox" style="max-width:700px;padding:0;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);">
+      <div><strong id="formTitle" style="font-size:14px;"></strong><div style="color:var(--gray);font-size:11px;">Complete the form to register</div></div>
+      <button class="mclose" style="position:static;" onclick="closeForm()"><i class="fas fa-times"></i></button>
+    </div>
+    <iframe id="formIframe" style="width:100%;height:70vh;border:none;" src=""></iframe>
+  </div>
+</div>
+
+<!-- PUBLISH SUCCESS -->
+<div class="overlay" id="pubModal">
+  <div class="mbox" style="max-width:340px;">
+    <div class="sanim">
+      <i class="fas fa-check-circle"></i>
+      <h3>Event Published! 🚀</h3>
+      <p style="color:var(--gray);font-size:13px;margin-bottom:16px;">Your event is now live. Students can see and register instantly.</p>
+      <button class="btn btn-p" onclick="closePub()">Go to Events Hub</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     PAGE: LANDING
+═══════════════════════════════════════════ -->
+<div class="page active" id="landing">
+  <div class="topbar">
+    <div class="logo-row">
+      <div id="logo1"></div>
+      <div class="logo-txt"><span class="main">NBKRIST</span><span class="sub">Events Hub</span></div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-g btn-sm" onclick="openModal('studentModal');switchAuth('login')"><i class="fas fa-sign-in-alt"></i> Student Login</button>
+      <button class="btn btn-p btn-sm" onclick="openModal('managerModal')"><i class="fas fa-shield-alt"></i> Manager Login</button>
+    </div>
+  </div>
+  <section class="hero">
+    <div class="hero-badge"><span class="dot"></span> Official Campus Portal</div>
+    <h1>NBKRIST Events Hub</h1>
+    <p class="htag">Discover. Register. Celebrate.</p>
+    <p class="hdesc">The centralized gateway for technical symposiums, hackathons, cultural festivals, and sports tournaments across all departments of N.B.K.R. Institute of Science & Technology.</p>
+    <div class="hero-btns">
+      <button class="btn btn-o" onclick="openModal('studentModal');switchAuth('reg')"><i class="fas fa-user-plus"></i> Create Student Account</button>
+      <button class="btn btn-g" onclick="openModal('studentModal');switchAuth('login')"><i class="fas fa-sign-in-alt"></i> Student Login</button>
+      <button class="btn btn-p" onclick="openModal('managerModal')"><i class="fas fa-shield-alt"></i> Event Manager</button>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><div><span class="num" id="statStudents">0</span></div><div class="lbl">Students Registered</div></div>
+      <div class="stat"><div><span class="num" id="statEvents">0</span></div><div class="lbl">Events Published</div></div>
+      <div class="stat"><div><span class="num">100</span><span class="suf">%</span></div><div class="lbl">Verified Certificates</div></div>
+    </div>
+  </section>
+  <section class="sec">
+    <div class="sec-head">
+      <div><div class="sec-tag">🔴 Live on Campus</div><div class="sec-title">Featured Events</div></div>
+      <div class="ftabs">
+        <div class="ftab on" onclick="landingF(this,'all')">All</div>
+        <div class="ftab" onclick="landingF(this,'tech')">Technical</div>
+        <div class="ftab" onclick="landingF(this,'hack')">Hackathons</div>
+        <div class="ftab" onclick="landingF(this,'cult')">Cultural</div>
+        <div class="ftab" onclick="landingF(this,'sports')">Sports</div>
+      </div>
+    </div>
+    <div class="egrid" id="landingGrid"></div>
+  </section>
+  <div class="foot-top"><strong>N.B.K.R. Institute of Science & Technology (Autonomous)</strong>, Vidyanagar, AP | AICTE Approved | NAAC A+ | <a href="mailto:events@nbkrist.org">events@nbkrist.org</a></div>
+  <div class="foot-bot">
+    <div class="logo-row"><div id="logo4"></div><div class="logo-txt"><span class="main" style="font-size:12px;">NBKRIST Events Hub</span><span class="sub">N.B.K.R. Institute of Science & Technology</span></div></div>
+    <div class="foot-links"><a href="#">Event Guidelines</a><a href="#">Faculty Clearance</a><a href="#">Terms</a></div>
+    <div style="font-size:11px;color:var(--gray);">© 2026 NBKRIST Events Hub</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PAGE: STUDENT DASHBOARD
+═══════════════════════════════════════════ -->
+<div class="page" id="student">
+  <div class="dash-nav">
+    <div class="logo-row"><div id="logo2"></div><div class="logo-txt"><span class="main" style="font-size:13px;">NBKRIST</span><span class="sub" style="color:var(--orange);">Student Portal</span></div></div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.22);border-radius:50px;padding:3px 11px;font-size:11px;font-weight:600;color:var(--orange);"><i class="fas fa-user-graduate" style="margin-right:4px;"></i>Student</div>
+      <div class="avatar" id="sAvNav"></div>
+    </div>
+  </div>
+  <div class="dash-body">
+    <aside class="sidebar">
+      <div style="padding:10px 8px 0;">
+        <div class="sitem on" onclick="sNav('sevents')" id="sn-sevents"><i class="fas fa-calendar-alt"></i> Events Hub</div>
+        <div class="sitem" onclick="sNav('sprofile')" id="sn-sprofile"><i class="fas fa-user"></i> My Profile</div>
+      </div>
+      <div class="sdiv"></div>
+      <div style="padding:0 8px;">
+        <div class="sitem" onclick="sNav('scerts')" id="sn-scerts"><i class="fas fa-certificate"></i> Certificates</div>
+        <div class="sitem" onclick="sNav('scontact')" id="sn-scontact"><i class="fas fa-phone-alt"></i> Contact Institute</div>
+        <div class="sitem" onclick="doLogout()" style="color:var(--red);margin-top:4px;"><i class="fas fa-sign-out-alt"></i> Logout</div>
+      </div>
+      <div style="margin-top:auto;padding:10px;">
+        <div class="s-user">
+          <div class="avatar" style="width:30px;height:30px;font-size:11px;" id="sAvSide"></div>
+          <div class="s-user-info"><strong id="sNameSide">Student</strong><span id="sBrSide">Branch</span></div>
+        </div>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="dsec on" id="sevents">
+        <div class="dhead"><h2>🎉 Events Hub</h2><p>Browse and register for campus events</p></div>
+        <div class="etabs">
+          <div class="etab on" onclick="sTab('ongoing',this)">🔴 Ongoing Events</div>
+          <div class="etab" onclick="sTab('completed',this)">✅ Completed Events</div>
+        </div>
+        <div class="egrid" id="sOngoing"></div>
+        <div class="egrid" id="sCompleted" style="display:none;"></div>
+      </div>
+      <div class="dsec" id="sprofile">
+        <div class="dhead"><h2>👤 My Profile</h2><p>Your student details and ID card</p></div>
+        <div class="pcard">
+          <div>
+            <div class="avatar-lg" id="pAvLg"></div>
+            <div class="idframe" id="idFrame" style="display:none;"><img id="pIdImg" src="" alt=""></div>
+            <div class="idframe" id="idPlaceholder"><p>ID Card</p></div>
+          </div>
+          <div class="pr">
+            <h3 id="pName">—</h3>
+            <div class="prole"><i class="fas fa-user-graduate"></i> Student</div>
+            <div class="pd"><i class="fas fa-id-badge"></i><span id="pRoll">—</span></div>
+            <div class="pd"><i class="fas fa-graduation-cap"></i><span id="pBranch">—</span></div>
+            <div class="pd"><i class="fas fa-calendar"></i><span id="pYear">—</span></div>
+            <div class="pd"><i class="fas fa-envelope"></i><span id="pEmail">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="dsec" id="scerts">
+        <div class="dhead"><h2>🏆 Certificates</h2><p>Issued after event completion by the manager</p></div>
+        <div class="cgrid" id="sCertGrid"></div>
+      </div>
+      <div class="dsec" id="scontact">
+        <div class="dhead"><h2>📞 Contact Institute</h2><p>NBKRIST administration contacts</p></div>
+        <div class="cgrid2">
+          <div>
+            <div class="cbox">
+              <h3><i class="fas fa-building"></i> Institute Details</h3>
+              <div class="ci"><div class="ci-icon"><i class="fas fa-university"></i></div><div class="ci-info"><strong>N.B.K.R. IST</strong><span>Autonomous | NAAC A+ | AICTE</span></div></div>
+              <div class="ci"><div class="ci-icon"><i class="fas fa-map-marker-alt"></i></div><div class="ci-info"><strong>Vidyanagar, Nellore Dist.</strong><span>Andhra Pradesh — 524 413</span></div></div>
+              <div class="ci"><div class="ci-icon"><i class="fas fa-phone"></i></div><div class="ci-info"><strong>Main Office</strong><a href="tel:+918624252212">+91 86242 52212</a></div></div>
+              <div class="ci"><div class="ci-icon"><i class="fas fa-envelope"></i></div><div class="ci-info"><strong>Events Desk</strong><a href="mailto:events@nbkrist.org">events@nbkrist.org</a></div></div>
+              <div class="ci"><div class="ci-icon"><i class="fas fa-envelope"></i></div><div class="ci-info"><strong>Principal</strong><a href="mailto:principal@nbkrist.org">principal@nbkrist.org</a></div></div>
+            </div>
+          </div>
+          <div>
+            <div class="cbox">
+              <h3><i class="fas fa-paper-plane"></i> Send a Message</h3>
+              <div class="fg"><label>Name</label><input type="text" placeholder="Full name"></div>
+              <div class="fg"><label>Email</label><input type="email" placeholder="your@email.com"></div>
+              <div class="fg"><label>Subject</label><input type="text" placeholder="Subject"></div>
+              <div class="fg"><label>Message</label><textarea placeholder="Type your message..."></textarea></div>
+              <button class="btn btn-o btn-full" onclick="toast('Message sent!','ok')"><i class="fas fa-paper-plane"></i> Send</button>
+            </div>
+            <div class="cbox" style="margin-top:13px;">
+              <h3><i class="fas fa-map"></i> Location</h3>
+              <div class="map-ph"><div style="text-align:center;"><i class="fas fa-map-marker-alt" style="font-size:20px;color:var(--orange);margin-bottom:7px;display:block;"></i><p style="font-size:12px;">NBKRIST, Vidyanagar, Nellore</p><a href="https://maps.google.com/?q=NBKRIST+Vidyanagar" target="_blank" style="color:var(--orange);font-size:11px;margin-top:6px;display:block;">Open in Google Maps →</a></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PAGE: MANAGER DASHBOARD
+═══════════════════════════════════════════ -->
+<div class="page" id="manager">
+  <div class="mgr-topbar">
+    <i class="fas fa-shield-alt"></i> <span>Event Manager Mode</span>
+    <span style="background:rgba(255,255,255,.17);border-radius:50px;padding:2px 10px;font-size:10px;letter-spacing:.4px;">AUTHORIZED</span>
+    <span id="mTopName" style="font-weight:400;opacity:.8;font-size:11px;"></span>
+    <button class="mgr-exit" onclick="mgrLogout()"><i class="fas fa-sign-out-alt" style="margin-right:4px;"></i>Exit</button>
+  </div>
+  <div class="dash-nav">
+    <div class="logo-row"><div id="logo3"></div><div class="logo-txt"><span class="main" style="font-size:13px;">NBKRIST</span><span class="sub" style="color:#a78bfa;">Manager Portal</span></div></div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.26);border-radius:50px;padding:3px 11px;font-size:11px;font-weight:600;color:#a78bfa;"><i class="fas fa-shield-alt" style="margin-right:4px;"></i>Manager</div>
+      <div class="mgr-avatar">M</div>
+    </div>
+  </div>
+  <div class="dash-body">
+    <aside class="sidebar">
+      <div class="host-btn" onclick="mNav('mcustomize');resetCust()"><i class="fas fa-plus-circle"></i> Host New Event</div>
+      <div style="padding:0 8px;"><div class="sitem on" onclick="mNav('mevents')" id="mn-mevents"><i class="fas fa-calendar-alt"></i> Events Hub</div></div>
+      <div class="sdiv"></div>
+      <div style="padding:0 8px;">
+        <div class="sitem" onclick="mNav('mcustomize');resetCust()" id="mn-mcustomize"><i class="fas fa-paint-brush"></i> Customize Event</div>
+        <div class="sitem" onclick="mNav('mrecords')" id="mn-mrecords"><i class="fas fa-clipboard-list"></i> Event Records <span class="sbadge" id="mBadge">0</span></div>
+        <div class="sitem" onclick="mNav('mcerts')" id="mn-mcerts"><i class="fas fa-certificate"></i> Certificates</div>
+      </div>
+      <div class="sdiv"></div>
+      <div style="padding:0 8px;">
+        <div class="sitem" onclick="mNav('mcontact')" id="mn-mcontact"><i class="fas fa-phone-alt"></i> Contact Institute</div>
+        <div class="sitem" onclick="mgrLogout()" style="color:var(--red);"><i class="fas fa-sign-out-alt"></i> Logout</div>
+      </div>
+      <div style="margin-top:auto;padding:10px;">
+        <div class="s-user">
+          <div class="mgr-avatar" style="width:30px;height:30px;font-size:11px;">M</div>
+          <div class="s-user-info"><strong id="mSideName">Manager</strong><span id="mSideDept"></span></div>
+          <div class="mgr-dot"></div>
+        </div>
+      </div>
+    </aside>
+    <main class="main">
+      <!-- EVENTS -->
+      <div class="dsec on" id="mevents">
+        <div class="dhead"><h2>🎉 Events Hub</h2><p>Students see exactly this view in real-time</p></div>
+        <div class="etabs">
+          <div class="etab on" onclick="mTab('ongoing',this)">🔴 Ongoing</div>
+          <div class="etab" onclick="mTab('completed',this)">✅ Completed</div>
+        </div>
+        <div class="egrid" id="mOngoing"></div>
+        <div class="egrid" id="mCompleted" style="display:none;"></div>
+      </div>
+      <!-- CUSTOMIZE -->
+      <div class="dsec" id="mcustomize">
+        <div class="dhead"><h2>🎨 Customize Event</h2><p>Fill details → Preview → Publish to student portal</p></div>
+        <div class="stepper">
+          <div class="step on" id="sp1"><div class="stepn">1</div><div class="step-lbl">Customize</div></div><div class="step-line"></div>
+          <div class="step" id="sp2"><div class="stepn">2</div><div class="step-lbl">Preview</div></div><div class="step-line"></div>
+          <div class="step" id="sp3"><div class="stepn">3</div><div class="step-lbl">Publish</div></div>
+        </div>
+        <div id="cStep1">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div>
+              <div class="fsec-title"><i class="fas fa-info-circle"></i> Event Details</div>
+              <div class="fg"><label>Event Name <span style="color:var(--orange);">*</span></label><input type="text" id="cName"></div>
+              <div class="fg"><label>Event Venue <span style="color:var(--orange);">*</span></label><input type="text" id="cVenue"></div>
+              <div class="row2">
+                <div class="fg"><label>Date <span style="color:var(--orange);">*</span></label><input type="date" id="cDate"></div>
+                <div class="fg"><label>Time</label><input type="time" id="cTime"></div>
+              </div>
+              <div class="fg"><label>Google Form Link <span style="color:var(--orange);">*</span></label><input type="url" id="cForm" placeholder="https://forms.google.com/..."></div>
+              <div class="fg"><label>Requirements</label><textarea id="cReq" placeholder="Prerequisites, team size, materials needed..."></textarea></div>
+              <div class="fg"><label>Category</label>
+                <select id="cCat"><option value="tech">Technical Symposium</option><option value="hack">Hackathon</option><option value="cult">Cultural & Fest</option><option value="sports">Sports</option><option value="workshop">Workshop</option></select>
+              </div>
+              <div class="fg"><label>Eligible Branches</label>
+                <div class="branch-sel" id="bSel">
+                  <div class="bitem" onclick="togB(this)">CSE</div><div class="bitem" onclick="togB(this)">ECE</div>
+                  <div class="bitem" onclick="togB(this)">EEE</div><div class="bitem" onclick="togB(this)">MECH</div>
+                  <div class="bitem" onclick="togB(this)">CIVIL</div><div class="bitem" onclick="togB(this)">IT</div>
+                  <div class="bitem" onclick="togB(this)">AI&DS</div><div class="bitem" onclick="togB(this)">ALL</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="fsec-title"><i class="fas fa-image"></i> Event Poster</div>
+              <div class="fg">
+                <div class="uarea" onclick="document.getElementById('posterIn').click()">
+                  <i class="fas fa-cloud-upload-alt icon"></i>
+                  <p>Click to upload event poster<br><span style="font-size:11px;">PNG / JPG up to 5MB</span></p>
+                  <div class="ufile" id="posterLabel"></div>
+                  <div class="uprev" id="posterPrev"><img id="posterThumb" src="" alt=""></div>
+                </div>
+                <input type="file" id="posterIn" style="display:none;" accept="image/*" onchange="onPoster(this)">
+              </div>
+              <div class="fsec-title" style="margin-top:4px;"><i class="fas fa-certificate"></i> Certificate</div>
+              <div class="fg"><label>Certificate Title</label><input type="text" id="cCertTitle" placeholder="e.g. Certificate of Participation"></div>
+              <div class="fg"><label>Certificate Type</label>
+                <select id="cCertType"><option value="participation">Participation</option><option value="winner">Winner</option><option value="runner">Runner-up</option><option value="completion">Completion</option></select>
+              </div>
+              <div class="fg">
+                <div class="uarea" onclick="document.getElementById('certIn').click()">
+                  <i class="fas fa-file-image icon"></i>
+                  <p>Upload certificate template<br><span style="font-size:11px;">Issued to students after completion</span></p>
+                  <div class="ufile" id="certLabel"></div>
+                  <div class="uprev" id="certPrev"><img id="certThumb" src="" alt=""></div>
+                </div>
+                <input type="file" id="certIn" style="display:none;" accept="image/*" onchange="onCertFile(this)">
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:12px;">
+            <button class="btn btn-g" onclick="toast('Draft saved!','ok')"><i class="fas fa-save"></i> Save Draft</button>
+            <button class="btn btn-p" onclick="goPreview()"><i class="fas fa-eye"></i> Preview Event</button>
+          </div>
+        </div>
+        <div id="cStep2" style="display:none;">
+          <div style="display:grid;grid-template-columns:285px 1fr;gap:22px;align-items:start;">
+            <div>
+              <p style="color:var(--gray);font-size:12px;margin-bottom:9px;text-align:center;">Student Card Preview</p>
+              <div class="prev-card">
+                <div class="prev-img" id="pvImg"><span>🎯</span></div>
+                <div class="prev-body">
+                  <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;" id="pvBranches"></div>
+                  <div class="ecard-title" id="pvTitle"></div>
+                  <div class="emeta" style="margin-top:7px;"><span><i class="fas fa-calendar"></i><span id="pvDate"></span></span><span><i class="fas fa-map-marker-alt"></i><span id="pvVenue"></span></span></div>
+                  <div class="ecard-desc" id="pvReq" style="margin-top:7px;"></div>
+                </div>
+              </div>
+              <div id="pvCertBox" style="display:none;margin-top:11px;background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden;">
+                <div style="height:88px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;" id="pvCertImg"><i class="fas fa-certificate" style="font-size:32px;color:var(--orange);"></i></div>
+                <div style="padding:10px;"><div style="font-weight:700;font-size:12px;" id="pvCertTitle"></div><div style="font-size:10px;color:var(--gray);" id="pvCertType"></div></div>
+              </div>
+            </div>
+            <div>
+              <h3 style="margin-bottom:10px;font-size:16px;">Ready to publish?</h3>
+              <p style="color:var(--gray);font-size:13px;line-height:1.75;margin-bottom:18px;">Once published, this event appears instantly in the student portal and is stored permanently in the database. Mark it as completed from Event Records to release certificates.</p>
+              <div style="display:flex;gap:10px;">
+                <button class="btn btn-g" onclick="backCust()"><i class="fas fa-arrow-left"></i> Edit</button>
+                <button class="btn btn-p" id="pubBtn" onclick="publishEvent()"><i class="fas fa-rocket"></i> Publish to Student Portal</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- RECORDS -->
+      <div class="dsec" id="mrecords">
+        <div class="dhead"><h2>📋 Event Records</h2><p>Manage events — mark complete to release certificates</p></div>
+        <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;">
+          <button class="btn btn-p btn-sm" onclick="fR('all',this)">All</button>
+          <button class="btn btn-g btn-sm" onclick="fR('ongoing',this)">Ongoing</button>
+          <button class="btn btn-g btn-sm" onclick="fR('completed',this)">Completed</button>
+        </div>
+        <div class="rtable"><table><thead><tr><th>Event</th><th>Date</th><th>Venue</th><th>Branches</th><th>Certificate</th><th>Status</th><th>Actions</th></tr></thead><tbody id="rBody"></tbody></table></div>
+      </div>
+      <!-- CERTS -->
+      <div class="dsec" id="mcerts">
+        <div class="dhead"><h2>🏆 Certificates</h2><p>Issued on event completion — visible to all students</p></div>
+        <div class="cgrid" id="mCertGrid"></div>
+      </div>
+      <!-- CONTACT -->
+      <div class="dsec" id="mcontact">
+        <div class="dhead"><h2>📞 Contact Institute</h2><p>Institute contacts</p></div>
+        <div class="cgrid2">
+          <div class="cbox">
+            <h3><i class="fas fa-building"></i> Institute</h3>
+            <div class="ci"><div class="ci-icon"><i class="fas fa-map-marker-alt"></i></div><div class="ci-info"><strong>Vidyanagar, Nellore Dist.</strong><span>Andhra Pradesh — 524 413</span></div></div>
+            <div class="ci"><div class="ci-icon"><i class="fas fa-phone"></i></div><div class="ci-info"><strong>Main Office</strong><a href="tel:+918624252212">+91 86242 52212</a></div></div>
+            <div class="ci"><div class="ci-icon"><i class="fas fa-envelope"></i></div><div class="ci-info"><strong>Events Desk</strong><a href="mailto:events@nbkrist.org">events@nbkrist.org</a></div></div>
+          </div>
+          <div class="cbox">
+            <h3><i class="fas fa-paper-plane"></i> Message</h3>
+            <div class="fg"><label>Name</label><input type="text" placeholder="Full name"></div>
+            <div class="fg"><label>Message</label><textarea placeholder="Type message..."></textarea></div>
+            <button class="btn btn-p btn-full" onclick="toast('Sent!','ok')"><i class="fas fa-paper-plane"></i> Send</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════ -->
+<script>
+// ──── SUPABASE ────
+const SB_URL = 'https://jaoxelheiiqyijumwtwm.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imphb3hlbGhlaWlxeWlqdW13dHdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExMTI4NDQsImV4cCI6MjEwNjY4ODg0NH0.21vkrXz0cwOdjYHmWWzU64EPDS0infaAuCVliku7zok';
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+// ──── OFFLINE ────
+function goOffline()  { document.getElementById('offlineScreen').classList.add('on'); }
+function goOnline()   { document.getElementById('offlineScreen').classList.remove('on'); location.reload(); }
+window.addEventListener('offline', goOffline);
+window.addEventListener('online',  goOnline);
+if (!navigator.onLine) { goOffline(); }
+
+// ──── MANAGER CREDENTIALS ────
+const MGR = { id:'NBKR2025', pass:'Admin@2025', key:'EVENTS2025' };
+
+// ──── STATE ────
+let authUser = null;
+let profile  = null;
+let mgr      = null;
+let events   = [];
+let ppFileObj   = null;  // profile photo file
+let idFileObj   = null;  // id card file
+let posterFileObj = null;
+let certFileObj   = null;
+
+// ──── LOGO (logo.png in same folder) ────
+function setLogos() {
+  ['logo1','logo2','logo3','logo4','authLogo'].forEach(id => {
+    const el = document.getElementById(id); if (!el) return;
+    const sz = id === 'authLogo' ? '48px' : '36px';
+    el.innerHTML = `<img src="logo.png" alt="" style="height:${sz};max-width:120px;object-fit:contain;" onerror="this.style.display='none'">`;
+  });
+}
+
+// ──── TOAST ────
+function toast(msg, t) {
+  const el = document.getElementById('toast');
+  el.className = 'show' + (t ? ' '+t : '');
+  el.textContent = msg;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = '', 3500);
+}
+
+// ──── MODALS ────
+function openModal(id)  { document.getElementById(id).classList.add('on'); }
+function closeModal(id) { document.getElementById(id).classList.remove('on'); }
+document.querySelectorAll('.overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('on'); });
+});
+
+// ──── UPLOAD HELPER ────
+async function uploadFile(bucket, file) {
+  const ext = file.name.split('.').pop();
+  const name = Date.now() + '_' + Math.random().toString(36).slice(2,8) + '.' + ext;
+  const { error } = await sb.storage.from(bucket).upload(name, file, { upsert:true });
+  if (error) throw error;
+  return sb.storage.from(bucket).getPublicUrl(name).data.publicUrl;
+}
+
+// ──── BTN HELPER ────
+function setBtn(id, dis, html) {
+  const b = document.getElementById(id); if (!b) return;
+  b.disabled = dis; b.innerHTML = html; b.style.opacity = dis ? '.6' : '1';
+}
+
+// ──── STATS ────
+async function loadStats() {
+  try {
+    const [s, e] = await Promise.all([
+      sb.from('profiles').select('*', { count:'exact', head:true }),
+      sb.from('events').select('*', { count:'exact', head:true })
+    ]);
+    animN('statStudents', s.count || 0);
+    animN('statEvents',   e.count || 0);
+  } catch(e) {}
+}
+function animN(id, target) {
+  const el = document.getElementById(id);
+  if (target === 0) { el.textContent = '0'; return; }
+  let v = 0; const step = Math.max(1, Math.ceil(target / 30));
+  const t = setInterval(() => { v = Math.min(v + step, target); el.textContent = v; if (v >= target) clearInterval(t); }, 35);
+}
+
+// ──── AUTH TABS ────
+function switchAuth(tab) {
+  document.getElementById('fLogin').classList.toggle('on', tab==='login');
+  document.getElementById('fReg').classList.toggle('on', tab==='reg');
+  document.getElementById('aLogin').classList.toggle('on', tab==='login');
+  document.getElementById('aReg').classList.toggle('on', tab==='reg');
+}
+
+// ──── ROLL CHECK ────
+function chkRoll() {
+  const inp = document.getElementById('rRoll');
+  inp.value = inp.value.replace(/[^a-zA-Z0-9]/g, '');
+  const err = document.getElementById('rollErr');
+  if (inp.value.length > 0 && inp.value.length < 10) { err.style.display='block'; inp.style.borderColor='var(--red)'; }
+  else if (inp.value.length === 10) { err.style.display='none'; inp.style.borderColor='var(--green)'; }
+  else { err.style.display='none'; inp.style.borderColor='var(--border)'; }
+}
+
+// ──── PHOTO UPLOADS (student) ────
+function onPP(input) {
+  ppFileObj = input.files[0]; if (!ppFileObj) return;
+  document.getElementById('ppThumb').src = URL.createObjectURL(ppFileObj);
+  document.getElementById('ppCircle').style.display = 'block';
+  document.getElementById('ppIcon').style.display = 'none';
+  document.getElementById('ppFn').textContent = ppFileObj.name;
+}
+function onID(input) {
+  idFileObj = input.files[0]; if (!idFileObj) return;
+  document.getElementById('idThumb').src = URL.createObjectURL(idFileObj);
+  document.getElementById('idPrev').style.display = 'block';
+  document.getElementById('idIcon').style.display = 'none';
+  document.getElementById('idFn').textContent = idFileObj.name;
+}
+
+// ──── STUDENT LOGIN ────
+async function doLogin() {
+  if (!navigator.onLine) { toast('No internet', 'err'); return; }
+  const email = document.getElementById('lEmail').value.trim();
+  const pass = document.getElementById('lPass').value;
+  if (!email || !pass) { toast('Fill in all fields', 'err'); return; }
+  setBtn('loginBtn', true, '<i class="fas fa-spinner fa-spin"></i> Logging in...');
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    authUser = data.user;
+    const { data: prof } = await sb.from('profiles').select('*').eq('id', authUser.id).single();
+    profile = prof;
+    closeModal('studentModal');
+    goStudentDash();
+    toast('Welcome back! 👋', 'ok');
+  } catch(e) {
+    toast(e.message || 'Login failed', 'err');
+  }
+  setBtn('loginBtn', false, '<i class="fas fa-sign-in-alt"></i> Login');
+}
+
+// ──── STUDENT REGISTER ────
+async function doRegister() {
+  if (!navigator.onLine) { toast('No internet', 'err'); return; }
+  if (!ppFileObj) { toast('Upload your profile photo', 'err'); return; }
+  if (!idFileObj) { toast('Upload your ID card photo', 'err'); return; }
+  const name   = document.getElementById('rName').value.trim();
+  const roll   = document.getElementById('rRoll').value.trim();
+  const email  = document.getElementById('rEmail').value.trim();
+  const branch = document.getElementById('rBranch').value;
+  const year   = document.getElementById('rYear').value;
+  const pass   = document.getElementById('rPass').value;
+  const pass2  = document.getElementById('rPass2').value;
+  if (!name||!roll||!email||!branch||!year||!pass) { toast('Fill all required fields', 'err'); return; }
+  if (roll.length !== 10 || !/^[a-zA-Z0-9]+$/.test(roll)) { toast('Roll must be 10 alphanumeric chars', 'err'); return; }
+  if (pass.length < 6) { toast('Password min 6 characters', 'err'); return; }
+  if (pass !== pass2) { toast('Passwords don\'t match', 'err'); return; }
+  setBtn('regBtn', true, '<i class="fas fa-spinner fa-spin"></i> Creating...');
+  try {
+    const { data, error } = await sb.auth.signUp({ email, password: pass });
+    if (error) throw error;
+    authUser = data.user;
+    const [photoUrl, idUrl] = await Promise.all([
+      uploadFile('profiles', ppFileObj),
+      uploadFile('id-cards', idFileObj)
+    ]);
+    const { error: pErr } = await sb.from('profiles').insert({
+      id: authUser.id, name, roll_number: roll, email, branch, year,
+      profile_photo_url: photoUrl, id_card_url: idUrl
+    });
+    if (pErr) throw pErr;
+    profile = { id: authUser.id, name, roll_number: roll, email, branch, year, profile_photo_url: photoUrl, id_card_url: idUrl };
+    closeModal('studentModal');
+    goStudentDash();
+    toast('Account created! Welcome 🎉', 'ok');
+    loadStats();
+  } catch(e) {
+    toast(e.message || 'Registration failed', 'err');
+  }
+  setBtn('regBtn', false, '<i class="fas fa-user-plus"></i> Create Account');
+}
+
+// ──── STUDENT DASHBOARD ────
+function goStudentDash() {
+  showPage('student');
+  const p = profile || {};
+  const name = p.name || authUser?.email?.split('@')[0] || 'Student';
+  const init = name.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+  const setAv = id => {
+    const el = document.getElementById(id);
+    if (p.profile_photo_url) el.innerHTML = `<img src="${p.profile_photo_url}" alt="">`;
+    else el.textContent = init;
+  };
+  setAv('sAvNav'); setAv('sAvSide');
+  document.getElementById('sNameSide').textContent = name;
+  document.getElementById('sBrSide').textContent = (p.branch||'') + (p.year?' · '+p.year:'');
+  // Profile page
+  document.getElementById('pName').textContent = name;
+  document.getElementById('pRoll').textContent = p.roll_number || '—';
+  document.getElementById('pBranch').textContent = p.branch || '—';
+  document.getElementById('pYear').textContent = p.year || '—';
+  document.getElementById('pEmail').textContent = authUser?.email || p.email || '—';
+  const pAv = document.getElementById('pAvLg');
+  if (p.profile_photo_url) pAv.innerHTML = `<img src="${p.profile_photo_url}" alt="">`;
+  else pAv.textContent = init;
+  if (p.id_card_url) {
+    document.getElementById('pIdImg').src = p.id_card_url;
+    document.getElementById('idFrame').style.display = 'block';
+    document.getElementById('idPlaceholder').style.display = 'none';
+  }
+  setLogos();
+  renderSEvents(); renderSCerts();
+}
+async function doLogout() {
+  await sb.auth.signOut();
+  authUser = null; profile = null;
+  showPage('landing');
+  toast('Logged out.');
+}
+
+// ──── MANAGER AUTH ────
+function doMgrLogin() {
+  const id  = document.getElementById('mId').value.trim();
+  const dept= document.getElementById('mDept').value;
+  const pass= document.getElementById('mPass').value;
+  const key = document.getElementById('mAuthKey').value.trim();
+  if (!id||!dept||!pass||!key) { toast('Fill all fields', 'err'); return; }
+  if (id !== MGR.id)    { toast('❌ Invalid Manager ID', 'err'); return; }
+  if (pass !== MGR.pass) { toast('❌ Incorrect password', 'err'); return; }
+  if (key !== MGR.key)   { toast('❌ Invalid Authorization Key', 'err'); return; }
+  mgr = { id, dept };
+  closeModal('managerModal');
+  goMgrDash();
+  toast('🛡️ Access Granted!', 'mgr');
+}
+function goMgrDash() {
+  showPage('manager');
+  document.getElementById('mTopName').textContent = mgr.id + ' · ' + mgr.dept;
+  document.getElementById('mSideName').textContent = mgr.id;
+  document.getElementById('mSideDept').textContent = mgr.dept;
+  setLogos();
+  renderMEvents(); renderMCerts(); renderRecords(); updateBadge();
+  mNav('mcustomize'); resetCust();
+}
+function mgrLogout() {
+  mgr = null;
+  showPage('landing');
+  toast('Manager session ended.');
+}
+
+// ──── PAGE SWITCH ────
+function showPage(id) {
+  ['landing','student','manager'].forEach(p => document.getElementById(p).classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ──── SECTION NAV ────
+function sNav(sec) {
+  document.querySelectorAll('#student .dsec').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('#student .sitem').forEach(s=>s.classList.remove('on'));
+  document.getElementById(sec).classList.add('on');
+  const n = document.getElementById('sn-'+sec); if(n) n.classList.add('on');
+}
+function mNav(sec) {
+  document.querySelectorAll('#manager .dsec').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('#manager .sitem').forEach(s=>s.classList.remove('on'));
+  document.getElementById(sec).classList.add('on');
+  const n = document.getElementById('mn-'+sec); if(n) n.classList.add('on');
+  if (sec==='mrecords') renderRecords();
+  if (sec==='mcerts') renderMCerts();
+}
+
+// ──── EVENTS FROM DB ────
+async function loadEvents() {
+  try {
+    const { data } = await sb.from('events').select('*').order('created_at',{ascending:false});
+    events = data || [];
+  } catch(e) { events = []; }
+}
+
+// ──── CARD HTML ────
+function cardHTML(ev) {
+  const done = ev.status === 'completed';
+  const brs = Array.isArray(ev.branches) ? ev.branches : [];
+  return `<div class="ecard${done?' done':''}">
+    <div class="ecard-img">${ev.poster_url?`<img src="${ev.poster_url}" alt="">`:'🎯'}
+      <div class="ebadges">${brs.slice(0,2).map(b=>`<span class="eb">${b}</span>`).join('')}</div>
+    </div>
+    <div class="ecard-body">
+      <div class="emeta"><span><i class="fas fa-calendar"></i>${ev.date}</span><span><i class="fas fa-map-marker-alt"></i>${(ev.venue||'').split(',')[0]}</span></div>
+      <div class="ecard-title">${ev.title}</div>
+      <div class="ecard-desc">${ev.description||'No description.'}</div>
+      <div class="ecard-foot">
+        <span class="${done?'estatus-done':'estatus-open'}">${done?'Completed':'● Open'}</span>
+        ${!done?`<button class="btn btn-o btn-sm" onclick="openFormModal('${ev.id}')"><i class="fas fa-arrow-right"></i> Register</button>`:`<button class="btn btn-g btn-sm">Details</button>`}
+      </div>
+    </div>
+  </div>`;
+}
+function emptyH(h,p,i){return `<div class="empty"><i class="${i}"></i><h3>${h}</h3><p>${p}</p></div>`;}
+
+// ──── RENDER EVENTS ────
+function renderLanding(cat) {
+  cat=cat||'all';
+  const list = events.filter(e=>e.status==='ongoing'&&(cat==='all'||e.category===cat));
+  document.getElementById('landingGrid').innerHTML = list.length ? list.map(cardHTML).join('') : emptyH('No events yet','Events published by managers will appear here.','fas fa-calendar');
+}
+function landingF(el,cat){document.querySelectorAll('#landing .ftab').forEach(t=>t.classList.remove('on'));el.classList.add('on');renderLanding(cat);}
+function renderSEvents(){
+  const on=events.filter(e=>e.status==='ongoing'), co=events.filter(e=>e.status==='completed');
+  document.getElementById('sOngoing').innerHTML=on.length?on.map(cardHTML).join(''):emptyH('No ongoing events','Check back soon!','fas fa-calendar-times');
+  document.getElementById('sCompleted').innerHTML=co.length?co.map(cardHTML).join(''):emptyH('No completed events','Past events appear here.','fas fa-check-circle');
+}
+function sTab(tab,el){document.querySelectorAll('#student .etab').forEach(t=>t.classList.remove('on'));el.classList.add('on');document.getElementById('sOngoing').style.display=tab==='ongoing'?'grid':'none';document.getElementById('sCompleted').style.display=tab==='completed'?'grid':'none';}
+function renderMEvents(){
+  const on=events.filter(e=>e.status==='ongoing'), co=events.filter(e=>e.status==='completed');
+  document.getElementById('mOngoing').innerHTML=on.length?on.map(cardHTML).join(''):emptyH('No ongoing events','Create one!','fas fa-calendar-times');
+  document.getElementById('mCompleted').innerHTML=co.length?co.map(cardHTML).join(''):emptyH('No completed events','Mark events as completed.','fas fa-check-circle');
+}
+function mTab(tab,el){document.querySelectorAll('#manager .etab').forEach(t=>t.classList.remove('on'));el.classList.add('on');document.getElementById('mOngoing').style.display=tab==='ongoing'?'grid':'none';document.getElementById('mCompleted').style.display=tab==='completed'?'grid':'none';}
+
+// ──── FORM MODAL ────
+function openFormModal(id) {
+  if (!authUser && !mgr) { openModal('studentModal'); switchAuth('login'); return; }
+  const ev = events.find(e=>e.id===id); if(!ev) return;
+  document.getElementById('formTitle').textContent = ev.title + ' — Registration';
+  const url = ev.form_url || '';
+  const iframe = document.getElementById('formIframe');
+  if (url.startsWith('http')) iframe.src = url+(url.includes('?')?'&':'?')+'embedded=true';
+  else iframe.srcdoc=`<div style="font-family:sans-serif;padding:60px;text-align:center;background:#0A1628;color:#fff;min-height:100%;"><h2 style="color:#FF6B35;">Registration Form</h2><p style="color:#8a9bb5;">Form link not yet configured.</p></div>`;
+  openModal('formModal');
+}
+function closeForm(){closeModal('formModal');document.getElementById('formIframe').src='';document.getElementById('formIframe').removeAttribute('srcdoc');}
+
+// ──── CUSTOMIZE EVENT ────
+function togB(el){el.classList.toggle('on');}
+function onPoster(input){posterFileObj=input.files[0];if(!posterFileObj)return;document.getElementById('posterThumb').src=URL.createObjectURL(posterFileObj);document.getElementById('posterPrev').style.display='block';document.getElementById('posterLabel').textContent=posterFileObj.name;}
+function onCertFile(input){certFileObj=input.files[0];if(!certFileObj)return;document.getElementById('certThumb').src=URL.createObjectURL(certFileObj);document.getElementById('certPrev').style.display='block';document.getElementById('certLabel').textContent=certFileObj.name;}
+
+function goPreview(){
+  const n=document.getElementById('cName').value.trim(),v=document.getElementById('cVenue').value.trim(),d=document.getElementById('cDate').value,f=document.getElementById('cForm').value.trim();
+  if(!n||!v||!d||!f){toast('Fill required (*) fields','err');return;}
+  document.getElementById('pvTitle').textContent=n;
+  document.getElementById('pvVenue').textContent=v;
+  document.getElementById('pvDate').textContent=d;
+  document.getElementById('pvReq').textContent=document.getElementById('cReq').value||'No requirements.';
+  const brs=[...document.querySelectorAll('#bSel .bitem.on')].map(b=>b.textContent);
+  document.getElementById('pvBranches').innerHTML=brs.map(b=>`<span class="eb" style="background:rgba(124,58,237,.8);">${b}</span>`).join('');
+  document.getElementById('pvImg').innerHTML=posterFileObj?`<img src="${URL.createObjectURL(posterFileObj)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:'<span>🎯</span>';
+  const ct=document.getElementById('cCertTitle').value.trim(),ctype=document.getElementById('cCertType').value;
+  if(ct||certFileObj){document.getElementById('pvCertBox').style.display='block';document.getElementById('pvCertImg').innerHTML=certFileObj?`<img src="${URL.createObjectURL(certFileObj)}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;">`:'<i class="fas fa-certificate" style="font-size:32px;color:var(--orange);"></i>';document.getElementById('pvCertTitle').textContent=ct||'Certificate';document.getElementById('pvCertType').textContent=ctype;}
+  else{document.getElementById('pvCertBox').style.display='none';}
+  document.getElementById('sp1').className='step done';document.getElementById('sp2').className='step on';
+  document.getElementById('cStep1').style.display='none';document.getElementById('cStep2').style.display='block';
+}
+function backCust(){document.getElementById('sp1').className='step on';document.getElementById('sp2').className='step';document.getElementById('cStep1').style.display='block';document.getElementById('cStep2').style.display='none';}
+
+async function publishEvent() {
+  if(!navigator.onLine){toast('No internet','err');return;}
+  setBtn('pubBtn',true,'<i class="fas fa-spinner fa-spin"></i> Publishing...');
+  try {
+    const title=document.getElementById('cName').value.trim().toUpperCase();
+    const venue=document.getElementById('cVenue').value.trim();
+    const date=document.getElementById('cDate').value;
+    const time=document.getElementById('cTime').value;
+    const formUrl=document.getElementById('cForm').value.trim();
+    const desc=document.getElementById('cReq').value.trim();
+    const cat=document.getElementById('cCat').value;
+    const ct=document.getElementById('cCertTitle').value.trim();
+    const ctype=document.getElementById('cCertType').value;
+    const brs=[...document.querySelectorAll('#bSel .bitem.on')].map(b=>b.textContent);
+    let posterUrl=null,certUrl=null;
+    if(posterFileObj) posterUrl=await uploadFile('posters',posterFileObj);
+    if(certFileObj) certUrl=await uploadFile('certificates',certFileObj);
+    const {error}=await sb.from('events').insert({
+      title, description:desc, date, time, venue, form_url:formUrl, category:cat,
+      branches:brs.length?brs:['ALL'], poster_url:posterUrl, status:'ongoing',
+      cert_title:ct||(title+' — '+ctype), cert_type:ctype,
+      cert_template_url:certUrl, has_cert:!!(ct||certFileObj), created_by:mgr.id
+    });
+    if(error) throw error;
+    document.getElementById('sp2').className='step done';document.getElementById('sp3').className='step on';
+    await loadEvents();
+    renderMEvents();renderRecords();updateBadge();renderLanding();loadStats();
+    openModal('pubModal');
+  } catch(e) { toast(e.message||'Publish failed','err'); }
+  setBtn('pubBtn',false,'<i class="fas fa-rocket"></i> Publish to Student Portal');
+}
+function closePub(){closeModal('pubModal');mNav('mevents');}
+function resetCust(){
+  ['cName','cVenue','cDate','cTime','cForm','cReq','cCertTitle'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['posterLabel','certLabel'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
+  ['posterPrev','certPrev'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  posterFileObj=null;certFileObj=null;
+  document.querySelectorAll('#bSel .bitem').forEach(b=>b.classList.remove('on'));
+  document.getElementById('sp1').className='step on';document.getElementById('sp2').className='step';document.getElementById('sp3').className='step';
+  document.getElementById('cStep1').style.display='block';document.getElementById('cStep2').style.display='none';
+}
+
+// ──── RECORDS ────
+function updateBadge(){document.getElementById('mBadge').textContent=events.length;}
+function renderRecords(filter){
+  filter=filter||'all';
+  const list=filter==='all'?events:events.filter(e=>e.status===filter);
+  const tb=document.getElementById('rBody');
+  if(!list.length){tb.innerHTML=`<tr><td colspan="7">${emptyH('No events','Publish from Customize','fas fa-clipboard-list')}</td></tr>`;return;}
+  tb.innerHTML=list.map(e=>{
+    const brs=Array.isArray(e.branches)?e.branches:[];
+    return `<tr>
+    <td><div style="display:flex;align-items:center;gap:9px;"><div class="thumb">${e.poster_url?`<img src="${e.poster_url}">`:'🎯'}</div><div><div style="font-weight:600;font-size:12px;">${e.title}</div><div style="font-size:11px;color:var(--gray);">${(e.description||'').substring(0,32)}${(e.description||'').length>32?'...':''}</div></div></div></td>
+    <td style="font-size:12px;color:var(--gray);">${e.date}</td>
+    <td style="font-size:12px;color:var(--gray);">${e.venue}</td>
+    <td style="font-size:12px;">${brs.join(', ')}</td>
+    <td><span style="font-size:12px;color:${e.has_cert?'var(--green)':'var(--gray)'}">${e.has_cert?'<i class="fas fa-certificate"></i> Yes':'—'}</span></td>
+    <td><span class="spill s-${e.status}">${e.status[0].toUpperCase()+e.status.slice(1)}</span></td>
+    <td><div style="display:flex;gap:5px;">${e.status==='ongoing'?`<button class="btn btn-green btn-sm" onclick="markDone('${e.id}')"><i class="fas fa-check"></i></button>`:''}<button class="btn btn-red btn-sm" onclick="delEv('${e.id}')"><i class="fas fa-trash"></i></button></div></td>
+  </tr>`}).join('');
+}
+async function markDone(id){
+  if(!navigator.onLine){toast('No internet','err');return;}
+  await sb.from('events').update({status:'completed'}).eq('id',id);
+  await loadEvents();
+  renderMEvents();renderRecords();renderMCerts();updateBadge();renderLanding();
+  if(authUser){renderSEvents();renderSCerts();}
+  toast('Completed! Certificates released ✅','ok');
+}
+async function delEv(id){
+  if(!navigator.onLine){toast('No internet','err');return;}
+  await sb.from('events').delete().eq('id',id);
+  await loadEvents();
+  renderMEvents();renderRecords();renderMCerts();updateBadge();renderLanding();loadStats();
+  if(authUser){renderSEvents();renderSCerts();}
+  toast('Deleted.');
+}
+function fR(f,btn){document.querySelectorAll('#mrecords .btn').forEach(b=>{b.className=b===btn?'btn btn-p btn-sm':'btn btn-g btn-sm';});renderRecords(f);}
+
+// ──── CERTIFICATES ────
+function certHTML(ev){
+  const cols={winner:'background:rgba(255,215,0,.17);border:1px solid rgba(255,215,0,.45);color:#ffd700',runner:'background:rgba(192,192,192,.17);border:1px solid rgba(192,192,192,.45);color:#c0c0c0',participation:'background:rgba(255,107,53,.17);border:1px solid rgba(255,107,53,.45);color:#FF6B35',completion:'background:rgba(34,197,94,.17);border:1px solid rgba(34,197,94,.45);color:#22c55e'};
+  return `<div class="ccard">
+    <div class="ccard-img">${ev.cert_template_url?`<img src="${ev.cert_template_url}">`:`<i class="fas fa-certificate" style="font-size:36px;color:var(--orange);"></i>`}
+      <div class="cribbon" style="${cols[ev.cert_type]||cols.participation};">${(ev.cert_type||'').toUpperCase()}</div>
+    </div>
+    <div class="ccard-body">
+      <div class="ccard-title">${ev.cert_title||ev.title}</div>
+      <div class="ccard-date"><i class="fas fa-calendar" style="margin-right:4px;"></i>${ev.date} · ${ev.title}</div>
+      <div style="display:flex;gap:7px;">
+        <button class="btn btn-o btn-sm" onclick="toast('Downloaded!','ok')"><i class="fas fa-download"></i> Download</button>
+        <button class="btn btn-g btn-sm" onclick="toast('Copied!','ok')"><i class="fas fa-share-alt"></i></button>
+      </div>
+    </div>
+  </div>`;
+}
+function renderSCerts(){
+  const list=events.filter(e=>e.status==='completed'&&e.has_cert);
+  document.getElementById('sCertGrid').innerHTML=list.length?list.map(certHTML).join(''):emptyH('No certificates yet','Issued after the manager completes an event.','fas fa-certificate');
+}
+function renderMCerts(){
+  const list=events.filter(e=>e.status==='completed'&&e.has_cert);
+  document.getElementById('mCertGrid').innerHTML=list.length?list.map(certHTML).join(''):emptyH('No certificates','Mark events as completed to release.','fas fa-certificate');
+}
+
+// ──── REALTIME ────
+sb.channel('ev_rt').on('postgres_changes',{event:'*',schema:'public',table:'events'},async()=>{
+  await loadEvents();
+  renderLanding();
+  if(authUser){renderSEvents();renderSCerts();}
+  if(mgr){renderMEvents();renderMCerts();renderRecords();updateBadge();}
+  loadStats();
+}).subscribe();
+
+// ──── INIT ────
+(async function(){
+  if(!navigator.onLine){document.getElementById('loadScreen').classList.add('off');goOffline();return;}
+  setLogos();
+  await loadEvents();
+  renderLanding();
+  await loadStats();
+  // Restore session
+  try {
+    const {data:{session}} = await sb.auth.getSession();
+    if(session?.user){
+      authUser=session.user;
+      const {data:prof}=await sb.from('profiles').select('*').eq('id',authUser.id).single();
+      profile=prof;
+    }
+  } catch(e){}
+  document.getElementById('loadScreen').classList.add('off');
+})();
+</script>
+</body>
+</html>
